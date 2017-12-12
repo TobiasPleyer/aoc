@@ -14,30 +14,41 @@ import qualified Data.Set as S
 import qualified Data.Map.Strict as M
 
 
-parse_identifier = many1 (satisfy isAlpha)
+parseIdentifier = many1 (satisfy isAlpha)
 
-tower_line = do
-  identifier <- parse_identifier
+parseTowerLine = do
+  identifier <- parseIdentifier
   skipSpaces
   weight <- between (char '(') (char ')') (many1 (satisfy isDigit))
-  children <- getChildren <++ (return [])
+  children <- parseChildren <++ (return [])
   eof
-  return (identifier, (read weight :: Int, children, 0::Int))
+  return (identifier, (read weight :: Int, children))
 
-getChildren = do
+parseChildren = do
   skipSpaces
   string "->"
   skipSpaces
-  sepBy1 parse_identifier (string ", ")
+  sepBy1 parseIdentifier (string ", ")
 
-parseTowers = map (fst . head . readP_to_S tower_line) . lines
+parseTowers = map (fst . head . readP_to_S parseTowerLine) . lines
 
-findRoot :: [(String, (Int, [String], Int))] -> String
+findRoot :: [(String, (Int, [String]))] -> String
 findRoot ts = (head . S.toList) (S.difference s1 s2)
   where
-    (s1,s2) = L.foldl' (\(s1,s2) (n,(w,cs,t)) -> (S.insert n s1, S.union s2 (S.fromList cs))) (S.empty,S.empty) ts
+    (s1,s2) = L.foldl' (\(s1,s2) (n,(w,cs)) -> (S.insert n s1, S.union s2 (S.fromList cs))) (S.empty,S.empty) ts
+
+calculateWeight ::
+  M.Map String (Int, [String]) {- The initial Map  -} ->
+  String                       {- The root element -} ->
+  Int                          {- The total weight -}
+calculateWeight towerMap root = weight + (sum (map (calculateWeight towerMap) children))
+  where
+    Just (weight,children) = M.lookup root towerMap
 
 main = do
   content <- (readFile . head) =<< getArgs
   let towers = parseTowers content
-  putStrLn $ "root: " ++ findRoot towers
+  let root = findRoot towers
+  putStrLn $ "root: " ++ root
+  let towerMap = M.fromList towers
+  print $ calculateWeight towerMap root
