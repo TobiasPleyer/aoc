@@ -45,10 +45,55 @@ calculateWeight towerMap root = weight + (sum (map (calculateWeight towerMap) ch
   where
     Just (weight,children) = M.lookup root towerMap
 
+getChildren
+  :: M.Map String (Int, [String])
+  -> String
+  -> [String]
+getChildren m k = case (M.lookup k m) of
+  Nothing -> []
+  Just (w,cs) -> cs
+
+getChildWeights towerMap root = map (calculateWeight towerMap) (getChildren towerMap root)
+
+findDifference towerMap root = go $ getChildWeights towerMap root
+  where
+    go xs = case xs of
+      x:y:z:rest -> go2 x y z
+      _ -> error "This is ambiguous"
+    go2 x y z
+      | x==y = z-x
+      | x==z = y-x
+      | otherwise = x-y
+
+findBadElement towerMap root = go childStats
+  where
+    childStats = zip children childWeights
+    Just (_,children) = M.lookup root towerMap
+    childWeights = getChildWeights towerMap root
+    go ((kx,wx):(ky,wy):(kz,wz):rest)
+      | (wx==wy) && (wx/=wz) = Just (kz,wz)
+      | (wx==wz) && (wx/=wy) = Just (ky,wy)
+      | (wy==wz) && (wy/=wx) = Just (kx,wx)
+      | otherwise = go2 (kx,wx) rest
+    go _ = Nothing
+    go2 x [] = Nothing
+    go2 (k,w) ((k',w'):xs)
+      | w==w' = go2 (k,w) xs
+      | otherwise = Just (k',w')
+
+findWantedValue towerMap diff root =
+  case (findBadElement towerMap root) of
+    Nothing -> w-diff
+    Just (k,w) -> findWantedValue towerMap diff k
+  where
+    Just (w,_) = M.lookup root towerMap
+
 main = do
   content <- (readFile . head) =<< getArgs
   let towers = parseTowers content
   let root = findRoot towers
   putStrLn $ "root: " ++ root
   let towerMap = M.fromList towers
-  print $ calculateWeight towerMap root
+  let difference = findDifference towerMap root
+  putStrLn $ "difference: " ++ show difference
+  putStrLn $ "wanted value: " ++ show (findWantedValue towerMap difference root)
