@@ -39,8 +39,11 @@ mkInstruction _ = Inst "x" (\x -> 0) "y" (\p -> False)
 
 parse = map (mkInstruction . words) . lines
 
-process m [] = calcMax m
-process m (i:is) = process (exec_inst m i) is
+process m n [] = (n, calcMax m)
+process m n (i:is) = process (M.insert r v m) (max n v) is
+  where
+    r = reg_name i
+    v = exec_inst m i
 
 exec_inst m i@(Inst reg ufunc creg cfunc) =
   let
@@ -49,12 +52,12 @@ exec_inst m i@(Inst reg ufunc creg cfunc) =
   in
     if (cfunc cval)
     then
-      M.insert reg (ufunc val) m
+      ufunc val
     else
-      m
+      val
 
 calcMax = maximum . M.elems
 
 main = do
   content <- (readFile . head) =<< getArgs
-  print $ process M.empty (parse content)
+  print $ process M.empty 0 (parse content)
